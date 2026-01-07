@@ -1,0 +1,5 @@
+{
+  "name": "LineBot AI Manager",
+  "description": "A sophisticated dashboard for managing and configuring AI-powered LINE Official Account chatbots. Set up key response topics, persona, and monitor conversation logic with Gemini integration.",
+  "requestFramePermissions": []
+}
