@@ -1,8 +1,12 @@
+
 const express = require('express');
 const line = require('@line/bot-sdk');
 const { GoogleGenAI } = require("@google/genai");
 const fs = require('fs');
 const path = require('path');
+
+// 提取正確的 MessagingApi 實體
+const { messagingApi } = line;
 
 const CONFIG_PATH = path.join(__dirname, 'bot_config.json');
 let botConfig = {
@@ -28,6 +32,11 @@ const lineConfig = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
   channelSecret: process.env.LINE_CHANNEL_SECRET || '',
 };
+
+// 建立 LINE Client 實例 (使用 9.x 推薦的調用方式)
+const client = new messagingApi.MessagingApiClient({
+  channelAccessToken: lineConfig.channelAccessToken
+});
 
 const app = express();
 
@@ -69,6 +78,7 @@ app.post('/webhook', line.middleware(lineConfig), (req, res) => {
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 async function handleEvent(event) {
+  // 只處理訊息事件中的文字訊息
   if (event.type !== 'message' || event.message.type !== 'text') return null;
 
   const userText = event.message.text;
@@ -77,7 +87,7 @@ async function handleEvent(event) {
     .map(kp => `- ${kp.title}: ${kp.content}`)
     .join('\n');
 
-  const systemInstruction = `你是 ${botConfig.botName}。人設: ${botConfig.persona}。知識庫內容：\n${activeKeyPoints}\n請用繁體中文回覆，語氣要像在 LINE 上聊天一樣親切且精簡。`;
+  const systemInstruction = `你是 ${botConfig.botName}。人設: ${botConfig.persona}。知識庫內容：\n${activeKeyPoints}\n請用繁體中文回覆，語氣要像在 LINE 上聊天一樣親切且精簡。不要使用過長的段落。`;
 
   try {
     const response = await genAI.models.generateContent({
@@ -87,14 +97,13 @@ async function handleEvent(event) {
     });
     
     const replyText = response.text || "抱歉，我暫時無法回答。";
-    const client = new line.MessagingApiClient(lineConfig);
     
     return client.replyMessage({
       replyToken: event.replyToken,
       messages: [{ type: 'text', text: replyText }],
     });
   } catch (error) {
-    console.error("Gemini API Error:", error.message);
+    console.error("Gemini or LINE API Error:", error.message);
     return null;
   }
 }
